@@ -16,6 +16,10 @@ const SuperAdminDashboard = ({ onLogout }) => {
     navigate('/login');
   };
 
+  const handleMenuClick = (path) => {
+    navigate(path);
+  };
+
   const renderContent = () => {
     switch (activeTab) {
       case 'overview':
@@ -45,8 +49,6 @@ const SuperAdminDashboard = ({ onLogout }) => {
             </div>
           </div>
         );
-      case 'manage-accounts':
-        return <h2>👤 Quản lý tài khoản </h2>;
       default:
         return null;
     }
@@ -56,8 +58,8 @@ const SuperAdminDashboard = ({ onLogout }) => {
     <div style={styles.wrapper}>
       <div style={styles.sidebar}>
         <h2 style={styles.logo}>Super Admin</h2>
-        <button onClick={() => setActiveTab('overview')} style={styles.sidebarButton}>📊 Tổng Quan</button>
-        <button onClick={() => setActiveTab('manage-accounts')} style={styles.sidebarButton}>👤 Quản lý Tài khoản</button>
+        <button onClick={() => handleMenuClick('/superadmin/dashboard')} style={styles.sidebarButton}>📊 Tổng Quan</button>
+        <button onClick={() => handleMenuClick('/superadmin/manage-accounts')} style={styles.sidebarButton}>👤 Quản lý Tài khoản</button>
         <button onClick={() => setShowChangePasswordPopup(true)} style={styles.sidebarButton}>🔒 Đổi mật khẩu</button>
         <button onClick={handleLogoutClick} style={{ ...styles.sidebarButton, backgroundColor: '#f44336' }}>🚪 Đăng xuất</button>
       </div>
@@ -75,7 +77,6 @@ const SuperAdminDashboard = ({ onLogout }) => {
 };
 
 export default SuperAdminDashboard;
-
 const styles = {
   wrapper: {
     display: 'flex',
@@ -145,3 +146,4 @@ const styles = {
     marginBottom: '10px',
   },
 };
+

@@ -33,7 +33,7 @@ import {
 } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon, Refresh as RefreshIcon } from '@mui/icons-material';
 
-const ManageAccounts = () => {
+const ManageAccounts = ({ onLogout }) => {
   const navigate = useNavigate();
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -42,7 +42,7 @@ const ManageAccounts = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState(null);
   const [accountData, setAccountData] = useState({
-    name: '',
+    username: '',
     email: '',
     role: '',
     password: '',
@@ -56,11 +56,17 @@ const ManageAccounts = () => {
     try {
       setLoading(true);
       const data = await getAccounts();
-      setAccounts(data);
+      console.log('Fetched accounts:', data);
+      if (Array.isArray(data)) {
+        setAccounts(data);
+      } else {
+        console.error('Received data is not an array:', data);
+        setError('Dữ liệu không hợp lệ');
+      }
       setError(null);
     } catch (err) {
+      console.error('Error fetching accounts:', err);
       setError('Không thể tải danh sách tài khoản');
-      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -70,12 +76,16 @@ const ManageAccounts = () => {
     if (window.confirm('Bạn có chắc chắn muốn xóa tài khoản này?')) {
       try {
         setLoading(true);
-        await deleteAccount(id);
-        setSuccess('Xóa tài khoản thành công');
-        fetchAccounts();
+        const response = await deleteAccount(id);
+        if (response) {
+          setSuccess('Xóa tài khoản thành công');
+          await fetchAccounts(); // Refresh danh sách sau khi xóa
+        } else {
+          throw new Error('Không thể xóa tài khoản');
+        }
       } catch (err) {
-        setError('Không thể xóa tài khoản');
-        console.error(err);
+        console.error('Lỗi khi xóa tài khoản:', err);
+        setError(err.message || 'Không thể xóa tài khoản');
       } finally {
         setLoading(false);
       }
@@ -86,11 +96,15 @@ const ManageAccounts = () => {
     if (window.confirm('Bạn có chắc chắn muốn đặt lại mật khẩu cho tài khoản này?')) {
       try {
         setLoading(true);
-        await resetPassword(id);
-        setSuccess('Đặt lại mật khẩu thành công');
+        const response = await resetPassword(id);
+        if (response) {
+          setSuccess('Đặt lại mật khẩu thành công');
+        } else {
+          throw new Error('Không thể đặt lại mật khẩu');
+        }
       } catch (err) {
-        setError('Không thể đặt lại mật khẩu');
-        console.error(err);
+        console.error('Lỗi khi đặt lại mật khẩu:', err);
+        setError(err.message || 'Không thể đặt lại mật khẩu');
       } finally {
         setLoading(false);
       }
@@ -100,35 +114,70 @@ const ManageAccounts = () => {
   const handleEditClick = (account) => {
     setEditingAccount(account.id);
     setAccountData({
-      name: account.name,
+      username: account.username,
       email: account.email,
       role: account.role,
-      password: '',
+      password: '', // Không hiển thị mật khẩu cũ
     });
     setIsEditModalOpen(true);
   };
 
   const handleSaveAccount = async () => {
-    if (!accountData.name || !accountData.email || !accountData.role) {
+    // Validate dữ liệu
+    if (!accountData.username || !accountData.email || !accountData.role) {
       setError('Vui lòng nhập đầy đủ thông tin tài khoản');
+      return;
+    }
+
+    // Validate email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(accountData.email)) {
+      setError('Email không hợp lệ');
+      return;
+    }
+
+    // Validate password khi tạo mới
+    if (!editingAccount && !accountData.password) {
+      setError('Vui lòng nhập mật khẩu');
       return;
     }
 
     try {
       setLoading(true);
       if (editingAccount) {
-        await updateAccount(editingAccount, accountData);
-        setSuccess('Cập nhật tài khoản thành công');
+        // Khi cập nhật, chỉ gửi các trường cần thiết
+        const updateData = {
+          username: accountData.username,
+          email: accountData.email,
+          role: accountData.role,
+        };
+        const response = await updateAccount(editingAccount, updateData);
+        if (response) {
+          setSuccess('Cập nhật tài khoản thành công');
+          await fetchAccounts();
+        }
       } else {
-        await createAccount(accountData);
-        setSuccess('Tạo tài khoản thành công');
+        // Khi tạo mới, gửi tất cả thông tin bao gồm mật khẩu
+        const createData = {
+          username: accountData.username,
+          email: accountData.email,
+          role: accountData.role,
+          password: accountData.password,
+        };
+        console.log('Creating account with data:', createData);
+        const response = await createAccount(createData);
+        console.log('Create account response:', response);
+        if (response) {
+          setSuccess('Tạo tài khoản thành công');
+          await fetchAccounts();
+        }
       }
-      fetchAccounts();
       setIsEditModalOpen(false);
       setEditingAccount(null);
+      setAccountData({ username: '', email: '', role: '', password: '' });
     } catch (err) {
-      setError('Không thể lưu tài khoản');
-      console.error(err);
+      console.error('Error saving account:', err);
+      setError(err.message || 'Không thể lưu tài khoản');
     } finally {
       setLoading(false);
     }
@@ -156,7 +205,7 @@ const ManageAccounts = () => {
           color="success"
           onClick={() => {
             setEditingAccount(null);
-            setAccountData({ name: '', email: '', role: '', password: '' });
+            setAccountData({ username: '', email: '', role: '', password: '' });
             setIsEditModalOpen(true);
           }}
         >
@@ -175,7 +224,7 @@ const ManageAccounts = () => {
           <TableHead>
             <TableRow>
               <TableCell>ID</TableCell>
-              <TableCell>Họ tên</TableCell>
+              <TableCell>Tên đăng nhập</TableCell>
               <TableCell>Email</TableCell>
               <TableCell>Vai trò</TableCell>
               <TableCell>Hành động</TableCell>
@@ -185,25 +234,31 @@ const ManageAccounts = () => {
             {accounts.map((account) => (
               <TableRow key={account.id}>
                 <TableCell>{account.id}</TableCell>
-                <TableCell>{account.name}</TableCell>
+                <TableCell>{account.username}</TableCell>
                 <TableCell>{account.email}</TableCell>
-                <TableCell>{account.role}</TableCell>
+                <TableCell>
+                  {account.role === 'superadmin' ? 'Super Admin' :
+                   account.role === 'admin' ? 'Admin' : 'Sinh viên'}
+                </TableCell>
                 <TableCell>
                   <IconButton
                     color="primary"
                     onClick={() => handleEditClick(account)}
+                    title="Sửa"
                   >
                     <EditIcon />
                   </IconButton>
                   <IconButton
                     color="warning"
                     onClick={() => handleResetPassword(account.id)}
+                    title="Đặt lại mật khẩu"
                   >
                     <RefreshIcon />
                   </IconButton>
                   <IconButton
                     color="error"
                     onClick={() => handleDeleteAccount(account.id)}
+                    title="Xóa"
                   >
                     <DeleteIcon />
                   </IconButton>
@@ -214,17 +269,27 @@ const ManageAccounts = () => {
         </Table>
       </TableContainer>
 
-      <Dialog open={isEditModalOpen} onClose={() => setIsEditModalOpen(false)}>
+      <Dialog 
+        open={isEditModalOpen} 
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditingAccount(null);
+          setAccountData({ username: '', email: '', role: '', password: '' });
+        }}
+        maxWidth="sm"
+        fullWidth
+      >
         <DialogTitle>
           {editingAccount ? 'Sửa thông tin tài khoản' : 'Thêm tài khoản mới'}
         </DialogTitle>
         <DialogContent>
           <TextField
             fullWidth
-            label="Họ tên"
-            value={accountData.name}
-            onChange={(e) => setAccountData({ ...accountData, name: e.target.value })}
+            label="Tên đăng nhập"
+            value={accountData.username}
+            onChange={(e) => setAccountData({ ...accountData, username: e.target.value })}
             margin="normal"
+            required
           />
           <TextField
             fullWidth
@@ -233,31 +298,50 @@ const ManageAccounts = () => {
             value={accountData.email}
             onChange={(e) => setAccountData({ ...accountData, email: e.target.value })}
             margin="normal"
+            required
           />
-          <TextField
-            fullWidth
-            label="Mật khẩu"
-            type="password"
-            value={accountData.password}
-            onChange={(e) => setAccountData({ ...accountData, password: e.target.value })}
-            margin="normal"
-          />
+          {!editingAccount && (
+            <TextField
+              fullWidth
+              label="Mật khẩu"
+              type="password"
+              value={accountData.password}
+              onChange={(e) => setAccountData({ ...accountData, password: e.target.value })}
+              margin="normal"
+              required
+            />
+          )}
           <FormControl fullWidth margin="normal">
             <InputLabel>Vai trò</InputLabel>
             <Select
               value={accountData.role}
               onChange={(e) => setAccountData({ ...accountData, role: e.target.value })}
               label="Vai trò"
+              required
             >
+              <MenuItem value="superadmin">Super Admin</MenuItem>
               <MenuItem value="admin">Admin</MenuItem>
-              <MenuItem value="student">Student</MenuItem>
+              <MenuItem value="student">Sinh viên</MenuItem>
             </Select>
           </FormControl>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setIsEditModalOpen(false)}>Hủy</Button>
-          <Button onClick={handleSaveAccount} variant="contained" color="primary">
-            Lưu
+          <Button 
+            onClick={() => {
+              setIsEditModalOpen(false);
+              setEditingAccount(null);
+              setAccountData({ username: '', email: '', role: '', password: '' });
+            }}
+          >
+            Hủy
+          </Button>
+          <Button 
+            onClick={handleSaveAccount} 
+            variant="contained" 
+            color="primary"
+            disabled={loading}
+          >
+            {editingAccount ? 'Cập nhật' : 'Thêm mới'}
           </Button>
         </DialogActions>
       </Dialog>
